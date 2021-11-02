@@ -55,7 +55,6 @@ class UsingMysql(object):
         return self._cursor
 
 
-
 # def check_it():
 #     with UsingMysql(log_time=True) as um:
 #         um.cursor.execute("select * from test")
@@ -88,8 +87,38 @@ def create_table(cursor):
     )ENGINE=InnoDB DEFAULT CHARSET=utf8;
     """
     cursor.execute(sql)
+    sql = """
+    CREATE TABLE if not exists `account_info`(
+    `account_id` 	varchar(20) primary key not null,
+    `name`			varchar(30),
+    `username`		varchar(30),
+    `email`			varchar(200)
+    )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+    """
+    cursor.execute(sql)
+    sql = """
+    CREATE TABLE if not exists `commit_relation`(
+    `child`     varchar(50) primary key not null,
+    `parent`    varchar(50)
+    )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+    """
+    cursor.execute(sql)
+    sql = """
+    CREATE TABLE if not exists `revision_info`(
+    `project` 	varchar(50) primary key not null,
+    `change_id`	varchar(100),
+    `kind`		varchar(15),
+    `number`	int,
+    `created`   date,
+    `uploader_id` varchar(20),
+    `ref`       varchar(50),
+    `commit_with_footers`   blob,
+    `commit`    varchar(50)
+    )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+    """
+    cursor.execute(sql)
 
-def create_database(cursor,db_name):
+def create_database(cursor, db_name):
     '''新建数据库'''
     sql = f'create database if not exists {db_name};'
     cursor.execute(sql)
@@ -122,13 +151,18 @@ def create_one(table, ):
         # 查看结果
         select_one(um.cursor)
 
+
 def insert_many(table, data):
     '''向全部字段插入数据'''
-    with UsingMysql(log_time=True) as um:
-        val = '%s, ' * (len(data[0])-1) + '%s'
+    with UsingMysql(log_time=False) as um:
+        val = '%s, ' * (len(data[0]) - 1) + '%s'
         sql = f'insert into {table} values ({val})'
-        um.cursor.executemany(sql, data)
+        if len(data) == 1:
+            um.cursor.execute(sql, data)
+        else:
+            um.cursor.executemany(sql, data)
         um.cursor.connection.commit()
+
 
 # def data_update():
 #     with UsingMysql(log_time=True) as um:
@@ -149,3 +183,8 @@ if __name__ == '__main__':
     # print(type(data[0]))
     with UsingMysql(log_time=True) as um:
         create_table(um.cursor)
+
+    # data = []
+    # data += [(111, "sgj")]
+    # insert_many("test", data)
+
