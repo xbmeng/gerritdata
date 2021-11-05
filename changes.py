@@ -50,11 +50,8 @@ def get_commentinfo(project, changeID):
 
 def get_changeinfo(changeId):
     url = BASE_URL + "/changes/" + changeId + "?o=DETAILED_LABELS&o=ALL_REVISIONS&o=ALL_COMMITS&o=ALL_FILES&o=DETAILED_ACCOUNTS&o=REVIEWER_UPDATES&o=MESSAGES&o=CURRENT_ACTIONS&o=CHANGE_ACTIONS&o=REVIEWED&o=COMMIT_FOOTERS"
-    # changeID = "qt%2Fqtdeclarative~dev~I155826a52090c5b13d14be6330813dc5a27f28e5"
     r = request_data(url)
-    # print(r.text)
     contnet = r.text[5:]
-    # print(str)
     json_object = json.loads(contnet)
     id = json_object["id"]
     project = json_object["project"]
@@ -119,12 +116,11 @@ def get_revisions_info(changeid, revisions, project):
             changeid, revision_id)
         filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size = get_file(changeid,
                                                                                                        revision_id)
-
         ret += [
             (None, project, changeid, kind, number, created, uploader_id, ref, commit_with_footers, commit)]  # 自增主码
         for parent in parents:
             commit_relation += [(commit, parent)]
-            print(commit, "-" , parent)
+            # print(commit, "-" , parent)
         commit_infos += [(commit, author_name, author_email, committer_name, committer_email, subject, message)]
         file_infos += [
             (project, commit, filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size)]
@@ -164,7 +160,7 @@ def get_file(changeid, revision_id):
     list_file_values = [i for i in json_file.values()]
     list_file_keys = [i for i in json_file.keys()]
     filename = list_file_keys[1]
-    status = list_file_values[0]["status"]
+    status = "M" if "status" not in list_file_values[0].keys() else list_file_values[0]["status"]
     binary = False if "binary" not in list_file_values[0].keys() else list_file_values[0]["binary"]
     old_path = None if "old_path" not in list_file_values[0].keys() else list_file_values[0]["old_path"]
     lines_inserted = 0 if "lines_inserted" not in list_file_values[1].keys() else list_file_values[1][
@@ -233,6 +229,9 @@ if __name__ == '__main__':
     database.insert_many("commit_info", commit_infos)
     database.insert_many("file_info", file_infos)
     t.close()
+
+
+
     # for change in changeids:
     #     data += get_changeinfo(change)
     # print(data)

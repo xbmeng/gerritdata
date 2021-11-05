@@ -11,4 +11,3 @@ def request_data(url):
         print("发送Request发生异常")
         print("url" + url)
     return req
-

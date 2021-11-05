@@ -46,6 +46,7 @@ def get_account_info():
         # print(len(accounts))
     return accounts
 
+
 if __name__ == '__main__':
     accounts = get_account_info()
     print(type(accounts))

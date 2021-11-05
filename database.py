@@ -161,6 +161,8 @@ def create_table(cursor):
         )ENGINE=InnoDB DEFAULT CHARSET=utf8;
         """
     cursor.execute(sql)
+
+
 def create_database(cursor, db_name):
     '''新建数据库'''
     sql = f'create database if not exists {db_name};'
@@ -230,4 +232,3 @@ if __name__ == '__main__':
     # data = []
     # data += [(111, "sgj")]
     # insert_many("test", data)
-
