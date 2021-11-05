@@ -1,56 +1,9 @@
 import json
 from tqdm import tqdm
-import requests
 import database
+from request import request_data
 
 BASE_URL = "https://codereview.qt-project.org"
-
-
-def request_data(url):
-    # print("Now request:" + url)
-    s = requests.session()
-    s.keep_alive = False
-    req = requests.get(url)
-    return req
-
-
-def get_account_info():
-    url = BASE_URL + "/accounts/?o=DETAILS&q=is:active"
-    r = request_data(url)
-    content = r.text[5:]
-    json_object = json.loads(content)
-    accounts = []
-    for obj in json_object:
-        if "name" in obj.keys():
-            if "username" in obj.keys():
-                if "email" in obj.keys():
-                    accounts += [(obj["_account_id"], obj["name"], obj["username"], obj["email"])]
-                else:
-                    accounts += [(obj["_account_id"], obj["name"], obj["username"], None)]
-            else:
-                accounts += [(obj["_account_id"], obj["name"], None, None)]
-        else:
-            accounts += [(obj["_account_id"], None, None, None)]
-    while "_more_accounts" in json_object[-1].keys() and json_object[-1]["_more_accounts"] == True:
-        url = BASE_URL + "/accounts/?o=DETAILS&q=is:active" + "&S=" + str(len(accounts))
-        r = request_data(url)
-        content = r.text[5:]
-        if content == "[]":
-            break
-        json_object = json.loads(content)
-        for obj in json_object:
-            if "name" in obj.keys():
-                if "username" in obj.keys():
-                    if "email" in obj.keys():
-                        accounts += [(obj["_account_id"], obj["name"], obj["username"], obj["email"])]
-                    else:
-                        accounts += [(obj["_account_id"], obj["name"], obj["username"], None)]
-                else:
-                    accounts += [(obj["_account_id"], obj["name"], None, None)]
-            else:
-                accounts += [(obj["_account_id"], None, None, None)]
-        # print(len(accounts))
-    return accounts
 
 
 def get_commentinfo(project, changeID):
@@ -136,32 +89,31 @@ def get_changeinfo(changeId):
     data = [(id, project, branch, changeid, subject, status, created, updated, submitted, submitter_id, owner_id,
              insertions, deletions, total_comment_count, unresolved_comment_count, number)]
     # print(type(data[0]))
-    message = get_change_message(changeid, json_object["messages"], project)
-    revisions, commit_relation = get_revisions_info(changeid, json_object["revisions"], project)
+    # message = get_change_message(id, json_object["messages"], project)
+    message = []
+    revisions, commit_relation, commit_info, file_info = get_revisions_info(id, json_object["revisions"], project)
 
-    return data, revisions, commit_relation, message
+    return data, revisions, commit_relation, commit_info, message, file_info
 
 
 def get_change_message(changeid, messages, project):
-    """
-        没找到position在哪
-    """
-    # print(messages)
-    json_mess = json.loads(messages)
-    # changeId = changeid
-    id = json_mess["id"]
-    author_id = json_mess["author"]["_account_id"]
-    real_author_id = json_mess["real_author"]["_account_id"]
-    date = json_mess["date"]
-    message = json_mess["message"]
-    revision_number = json_mess["_revision_number"]
-    return [(changeid, id, author_id, real_author_id, date, message, revision_number, project)]
+    for index in range(len(messages)):
+        id = messages[index]["id"]
+        author_id = messages[index]["author"]["_account_id"]
+        real_author_id = messages[index]["real_author"]["_account_id"]
+        date = messages[index]["date"]
+        message = messages[index]["message"]
+        revision_number = messages[index]["_revision_number"]
+        position = index
+    return [(changeid, id, author_id, real_author_id, date, message, revision_number, position, project)]
 
 
 def get_revisions_info(changeid, revisions, project):
     # print(type(reversions))
     ret = []
     commit_relation = []
+    commit_infos = []
+    file_infos = []
     for revision_id in revisions.keys():
         kind = revisions[revision_id]["kind"]
         number = revisions[revision_id]["_number"]
@@ -173,34 +125,97 @@ def get_revisions_info(changeid, revisions, project):
         else:
             commit_with_footers = None
 
-        url = BASE_URL + "/changes/" + changeid + "/revisions/" + revision_id + "/commit"
-        r = request_data(url)
-        contnet = r.text[5:]
-        json_object = json.loads(contnet)
-        commit = json_object["commit"]
-        parent = json_object["parents"][0]["commit"]
-        ret += [(project, changeid, kind, number, created, uploader_id, ref, commit_with_footers, commit)]
+        commit, parent, author_name, author_email, committer_name, committer_email, subject, message = get_commit(
+            changeid, revision_id)
+        filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size = get_file(changeid,
+                                                                                                       revision_id)
+        # commit_url = BASE_URL + "/changes/" + changeid + "/revisions/" + revision_id + "/commit"
+        # r = request_data(commit_url)
+        # commit_contnet = r.text[5:]
+        # # print("content:" + contnet)
+        #
+        # try:
+        #     json_commit = json.loads(commit_contnet)
+        # except Exception:
+        #     print("\ncontent:" + commit_contnet)
+        #     continue
+        # commit = json_commit["commit"]
+        # parent = json_commit["parents"][0]["commit"]
+        # author_name = json_commit["author"]["name"]
+        # author_email = json_commit["author"]["email"]
+        # committer_name = json_commit["author"]["name"]
+        # committer_email = json_commit["author"]["email"]
+        # subject = json_commit["subject"]
+        # message = json_commit["message"]
+
+        # file_url = BASE_URL + "/changes/" + changeid + "/revisions/" + revision_id + "/files"
+        # print(file_url)
+        # r = request_data(file_url)
+        # file_contnet = r.text[5:]
+        # json_file = json.loads(file_contnet)
+        # list_file_values = [i for i in json_file.values()]
+        # list_file_keys = [i for i in json_file.keys()]
+        # filename = list_file_keys[1]
+        # status = list_file_values[0]["status"]
+        # binary = False if "binary" not in list_file_values[0].keys() else list_file_values[0]["binary"]
+        # old_path = None if "old_path" not in list_file_values[0].keys() else list_file_values[0]["old_path"]
+        # lines_inserted = 0 if "lines_inserted" not in list_file_values[1].keys() else list_file_values[1][
+        #     "lines_inserted"]
+        # lines_deleted = 0 if "lines_deleted" not in list_file_values[1].keys() else list_file_values[1]["lines_deleted"]
+        # size_delta = list_file_values[1]["size_delta"]
+        # size = list_file_values[1]["size"]
+
+        ret += [
+            (None, project, changeid, kind, number, created, uploader_id, ref, commit_with_footers, commit)]  # 自增主码
         commit_relation += [(commit, parent)]
-    return ret, commit_relation
+        commit_infos += [(commit, author_name, author_email, committer_name, committer_email, subject, message)]
+        file_infos += [
+            (project, commit, filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size)]
+    return ret, commit_relation, commit_infos, file_infos
+
+
+def get_commit(changeid, revision_id):
+    commit_url = BASE_URL + "/changes/" + changeid + "/revisions/" + revision_id + "/commit"
+    r = request_data(commit_url)
+    commit_contnet = r.text[5:]
+    # print("content:" + contnet)
+    try:
+        json_commit = json.loads(commit_contnet)
+    except Exception:
+        print("\ncontent:" + commit_contnet)
+        return None
+    commit = json_commit["commit"]
+    parent = json_commit["parents"][0]["commit"]
+    author_name = json_commit["author"]["name"]
+    author_email = json_commit["author"]["email"]
+    committer_name = json_commit["author"]["name"]
+    committer_email = json_commit["author"]["email"]
+    subject = json_commit["subject"]
+    message = json_commit["message"]
+    return commit, parent, author_name, author_email, committer_name, committer_email, subject, message
+
+
+def get_file(changeid, revision_id):
+    file_url = BASE_URL + "/changes/" + changeid + "/revisions/" + revision_id + "/files"
+    print(file_url)
+    r = request_data(file_url)
+    file_contnet = r.text[5:]
+    json_file = json.loads(file_contnet)
+    list_file_values = [i for i in json_file.values()]
+    list_file_keys = [i for i in json_file.keys()]
+    filename = list_file_keys[1]
+    status = list_file_values[0]["status"]
+    binary = False if "binary" not in list_file_values[0].keys() else list_file_values[0]["binary"]
+    old_path = None if "old_path" not in list_file_values[0].keys() else list_file_values[0]["old_path"]
+    lines_inserted = 0 if "lines_inserted" not in list_file_values[1].keys() else list_file_values[1][
+        "lines_inserted"]
+    lines_deleted = 0 if "lines_deleted" not in list_file_values[1].keys() else list_file_values[1]["lines_deleted"]
+    size_delta = list_file_values[1]["size_delta"]
+    size = list_file_values[1]["size"]
+    return filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size
 
 
 if __name__ == '__main__':
-    # data, revisions, commit_relations = get_changeinfo(
-    #     "qt%2Fqtdeclarative~dev~I155826a52090c5b13d14be6330813dc5a27f28e5")
-    # print(commit_relations)
-    # print(revisions)
-    # get_commentinfo("666", "qt%2Fqtdeclarative~dev~I155826a52090c5b13d14be6330813dc5a27f28e5")
-    # accounts = get_account_info()
-    # print(type(accounts))
-    # print(accounts[:10])
-    # t = tqdm(range(len(accounts)), ncols=80)
-    # cot = 0
-    # for i in t:
-    #     if i > 0 and i % 100 == 0:
-    #         database.insert_many("account_info", accounts[cot:i])
-    #         cot += 100
-    # database.insert_many("account_info", accounts[cot:])
-
     url = BASE_URL + "/changes/"
     r = request_data(url)
     content = r.text[5:]
@@ -220,23 +235,44 @@ if __name__ == '__main__':
     revision_infos = []
     commit_relations = []
     change_messages = []
-    t = tqdm(range(len(changeids[:10])), ncols=80)
+    commit_infos = []
+    file_infos = []
+    t = tqdm(range(len(changeids[:20])), ncols=80)
     for i in t:
         tqdm.write("Collecting:" + changeids[i], end="")
-        change_data, revision_info, commit_relation, change_message = get_revisions_info(changeids[i])
+        change_data, revision_info, commit_relation, commit_info, change_message, file_info = get_changeinfo(
+            changeids[i])
         change_datas += change_data
         revision_infos += revision_info
         commit_relations += commit_relation
         change_messages += change_message
-        if i > 0 and i % 1000 == 0:
-            database.insert_many("change_id", change_data)
-            change_data.clear()
-        if i > 0 and i % 100 == 0:
+        commit_infos += commit_info
+        file_infos += file_info
+        if i > 0 and i % 200 == 0:
+            database.insert_many("change_id", change_datas)
+            change_datas.clear()
+        if i > 0 and i % 50 == 0:
             database.insert_many("revision_info", revision_infos)
-
+            revision_infos.clear()
+        if i > 0 and i % 100 == 0:
+            database.insert_many("commit_relation", commit_relations)
+            commit_relations.clear()
+        if i > 0 and i % 150 == 0:
+            database.insert_many("change_message_info", change_messages)
+            change_messages.clear()
+        if i > 0 and i % 5 == 0:
+            database.insert_many("commit_info", commit_infos)
+            commit_infos.clear()
+        if i > 0 and i % 5 == 0:
+            database.insert_many("file_info", file_infos)
+            file_infos.clear()
+    database.insert_many("change_id", change_datas)
+    database.insert_many("revision_info", revision_infos)
+    database.insert_many("commit_relation", commit_relations)
+    database.insert_many("change_message_info", change_messages)
+    database.insert_many("commit_info", commit_infos)
+    database.insert_many("file_info", file_infos)
     t.close()
-    database.insert_many("change_id", change_data)
-
     # for change in changeids:
     #     data += get_changeinfo(change)
     # print(data)

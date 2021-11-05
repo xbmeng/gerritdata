@@ -105,7 +105,8 @@ def create_table(cursor):
     cursor.execute(sql)
     sql = """
     CREATE TABLE if not exists `revision_info`(
-    `project` 	varchar(50) primary key not null,
+    `id`    int primary key not null AUTO_INCREMENT,
+    `project` 	varchar(50) ,
     `change_id`	varchar(100),
     `kind`		varchar(15),
     `number`	int,
@@ -117,7 +118,48 @@ def create_table(cursor):
     )ENGINE=InnoDB DEFAULT CHARSET=utf8;
     """
     cursor.execute(sql)
-
+    sql = """
+        CREATE TABLE if not exists `change_message_info`(
+        `change_id`	varchar(100) primary key not null,
+        `id`		varchar(100),
+        `author_id`	varchar(30),
+        `real_author_id`	varchar(30),
+        `date`   date,
+        `message` blob,
+        `revision_number`   int,
+        `position`  int,
+        `project`   varchar(50)
+        )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+        """
+    cursor.execute(sql)
+    sql = """
+        CREATE TABLE if not exists `commit_info`(
+        `commit`	varchar(100) primary key not null,
+        `author_name`		varchar(20),
+        `author_email`	varchar(200),
+        `committer_name`	varchar(20),
+        `committer_email`   varchar(200),
+        `subject` blob,
+        `message`   blob
+        )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+        """
+    cursor.execute(sql)
+    sql = """
+        CREATE TABLE if not exists `file_info`(
+        `project`	varchar(50),
+        `commit`		varchar(100),
+        `filename`	varchar(200),
+        `status`	varchar(10),
+        `binary`   tinyint(1),
+        `old_path` varchar(100),
+        `lines_inserted`    int,
+        `lines_deleted`     int,
+        `size_delta`        int,
+        `size`              int,
+        PRIMARY KEY (`commit`, `filename`)
+        )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+        """
+    cursor.execute(sql)
 def create_database(cursor, db_name):
     '''新建数据库'''
     sql = f'create database if not exists {db_name};'
