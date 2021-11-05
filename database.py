@@ -98,8 +98,9 @@ def create_table(cursor):
     cursor.execute(sql)
     sql = """
     CREATE TABLE if not exists `commit_relation`(
-    `child`     varchar(50) primary key not null,
-    `parent`    varchar(50)
+    `child`     varchar(50) not null,
+    `parent`    varchar(50),
+    PRIMARY KEY (`child`, `parent`)
     )ENGINE=InnoDB DEFAULT CHARSET=utf8;
     """
     cursor.execute(sql)
