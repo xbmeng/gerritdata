@@ -6,18 +6,19 @@ from request import request_data
 BASE_URL = "https://codereview.qt-project.org"
 
 
-def get_commentinfo(project, changeID):
+def get_commentinfo(changeID):
     url = BASE_URL + "/changes/" + changeID + "?o=DETAILED_LABELS&o=ALL_REVISIONS&o=ALL_COMMITS&o=ALL_FILES&o=DETAILED_ACCOUNTS&o=REVIEWER_UPDATES&o=MESSAGES&o=CURRENT_ACTIONS&o=CHANGE_ACTIONS&o=REVIEWED&o=COMMIT_FOOTERS"
     r = request_data(url)
     content = r.text[5:]
     json_object = json.loads(content)
+    project = json_object["project"]
     current_revision = json_object["current_revision"]
     url = BASE_URL + "/changes/" + changeID + "/revisions/" + current_revision + "/commit"
     r = request_data(url)
     content = r.text[5:]
     json_object = json.loads(content)
     commit = json_object["commit"]
-    parent = json_object["parents"]["commit"]
+    parent = json_object["parents"][0]["commit"]
     url = BASE_URL + "/changes/" + changeID + "/comments"
     r = request_data(url)
     content = r.text[5:]
@@ -29,8 +30,8 @@ def get_commentinfo(project, changeID):
             patch_set = data["patch_set"]
             id = data["id"]
             path = file
-            side = data["side"]
-            line = data["line"]
+            side = "REVISION" if "side" not in data.keys() else data["side"]
+            line = None if "line" not in data.keys() else data["line"]
             if "range" in json_object.keys():
                 range_str = "range:" + data["range"]
             else:
@@ -43,8 +44,9 @@ def get_commentinfo(project, changeID):
             updated = data["updated"]
             author_id = data["author"]["_account_id"]
             unresolved = 1 if data["unresolved"] == True else 0
+            change_message_id = None
             comment_info += [(project, changeID, patch_set, id, path, side, parent, line, range_str, in_reply_to,
-                              message, updated, author_id, unresolved, commit)]
+                              message, updated, author_id, unresolved, commit, change_message_id)]
     return comment_info
 
 
@@ -84,6 +86,7 @@ def get_changeinfo(changeId):
 
 
 def get_change_message(changeid, messages, project):
+    ret = []
     for index in range(len(messages)):
         id = messages[index]["id"]
         author_id = messages[index]["author"]["_account_id"]
@@ -92,7 +95,8 @@ def get_change_message(changeid, messages, project):
         message = messages[index]["message"]
         revision_number = messages[index]["_revision_number"]
         position = index
-    return [(changeid, id, author_id, real_author_id, date, message, revision_number, position, project)]
+        ret += [(changeid, id, author_id, real_author_id, date, message, revision_number, position, project)]
+    return ret
 
 
 def get_revisions_info(changeid, revisions, project):
@@ -114,16 +118,16 @@ def get_revisions_info(changeid, revisions, project):
 
         commit, parents, author_name, author_email, committer_name, committer_email, subject, message = get_commit(
             changeid, revision_id)
-        filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size = get_file(changeid,
-                                                                                                       revision_id)
+        file_infos = get_file(changeid,revision_id)
         ret += [
             (None, project, changeid, kind, number, created, uploader_id, ref, commit_with_footers, commit)]  # 自增主码
         for parent in parents:
             commit_relation += [(commit, parent)]
             # print(commit, "-" , parent)
         commit_infos += [(commit, author_name, author_email, committer_name, committer_email, subject, message)]
-        file_infos += [
-            (project, commit, filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size)]
+        for i in range(len(file_infos)):
+            file_infos[i] = ((project, commit) + file_infos[i])
+        # [(project, commit, filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size)]
     return ret, commit_relation, commit_infos, file_infos
 
 
@@ -157,18 +161,21 @@ def get_file(changeid, revision_id):
     r = request_data(file_url)
     file_contnet = r.text[5:]
     json_file = json.loads(file_contnet)
+    ret = []
     list_file_values = [i for i in json_file.values()]
     list_file_keys = [i for i in json_file.keys()]
-    filename = list_file_keys[1]
     status = "M" if "status" not in list_file_values[0].keys() else list_file_values[0]["status"]
     binary = False if "binary" not in list_file_values[0].keys() else list_file_values[0]["binary"]
     old_path = None if "old_path" not in list_file_values[0].keys() else list_file_values[0]["old_path"]
-    lines_inserted = 0 if "lines_inserted" not in list_file_values[1].keys() else list_file_values[1][
-        "lines_inserted"]
-    lines_deleted = 0 if "lines_deleted" not in list_file_values[1].keys() else list_file_values[1]["lines_deleted"]
-    size_delta = list_file_values[1]["size_delta"]
-    size = list_file_values[1]["size"]
-    return filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size
+    for i in range(1, len(list_file_keys)):
+        filename = list_file_keys[i]
+        lines_inserted = 0 if "lines_inserted" not in list_file_values[i].keys() else list_file_values[i][
+            "lines_inserted"]
+        lines_deleted = 0 if "lines_deleted" not in list_file_values[i].keys() else list_file_values[i]["lines_deleted"]
+        size_delta = list_file_values[i]["size_delta"]
+        size = list_file_values[i]["size"]
+        ret += [(filename, status, binary, old_path, lines_inserted, lines_deleted, size_delta, size)]
+    return ret
 
 
 if __name__ == '__main__':
@@ -193,11 +200,14 @@ if __name__ == '__main__':
     change_messages = []
     commit_infos = []
     file_infos = []
+    comment_infos = []
     t = tqdm(range(len(changeids[:20])), ncols=80)
     for i in t:
         tqdm.write("Collecting:" + changeids[i], end="")
         change_data, revision_info, commit_relation, commit_info, change_message, file_info = get_changeinfo(
             changeids[i])
+        comment_infos += get_commentinfo(changeids[i])
+
         change_datas += change_data
         revision_infos += revision_info
         commit_relations += commit_relation
@@ -205,7 +215,7 @@ if __name__ == '__main__':
         commit_infos += commit_info
         file_infos += file_info
         if i > 0 and i % 200 == 0:
-            database.insert_many("change_id", change_datas)
+            database.insert_many("change_info", change_datas)
             change_datas.clear()
         if i > 0 and i % 50 == 0:
             database.insert_many("revision_info", revision_infos)
@@ -222,15 +232,17 @@ if __name__ == '__main__':
         if i > 0 and i % 5 == 0:
             database.insert_many("file_info", file_infos)
             file_infos.clear()
-    database.insert_many("change_id", change_datas)
+        if i > 0 and i % 5 == 0:
+            database.insert_many("comment_info", comment_infos)
+            commit_infos.clear()
+    database.insert_many("change_info", change_datas)
     database.insert_many("revision_info", revision_infos)
     database.insert_many("commit_relation", commit_relations)
     database.insert_many("change_message_info", change_messages)
     database.insert_many("commit_info", commit_infos)
     database.insert_many("file_info", file_infos)
+    database.insert_many("comment_info", comment_infos)
     t.close()
-
-
 
     # for change in changeids:
     #     data += get_changeinfo(change)

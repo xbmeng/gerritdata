@@ -67,7 +67,7 @@ def create_table(cursor):
     id100不够长
     '''
     sql = """
-    CREATE TABLE if not exists `change_id`(
+    CREATE TABLE if not exists `change_info`(
     `id` 	varchar(200) primary key not null,
     `project` 	varchar(50),
     `branch` 	varchar(50), 
@@ -108,7 +108,7 @@ def create_table(cursor):
     CREATE TABLE if not exists `revision_info`(
     `id`    int primary key not null AUTO_INCREMENT,
     `project` 	varchar(50) ,
-    `change_id`	varchar(100),
+    `change_id`	varchar(200),
     `kind`		varchar(15),
     `number`	int,
     `created`   date,
@@ -121,7 +121,7 @@ def create_table(cursor):
     cursor.execute(sql)
     sql = """
         CREATE TABLE if not exists `change_message_info`(
-        `change_id`	varchar(100) primary key not null,
+        `change_id`	varchar(200) primary key not null,
         `id`		varchar(100),
         `author_id`	varchar(30),
         `real_author_id`	varchar(30),
@@ -158,6 +158,27 @@ def create_table(cursor):
         `size_delta`        int,
         `size`              int,
         PRIMARY KEY (`commit`, `filename`)
+        )ENGINE=InnoDB DEFAULT CHARSET=utf8;
+        """
+    cursor.execute(sql)
+    sql = """
+        CREATE TABLE if not exists `comment_info`(
+        `project`	varchar(50),
+        `change_id`		varchar(100),
+        `patch_set`	int,
+        `id`	varchar(100) primary key not NULL,
+        `path`   varchar(100),
+        `side` varchar(20),
+        `parent`    varchar(100),
+        `line`  int,
+        `comment_range` blob,
+        `in_reply_to`    varchar(100),
+        `messaeg`     blob,
+        `updated`     date,
+        `author_id` int,
+        `unresolved`    int,
+        `commit`        varchar(100),
+        `change_message_id` varchar(50) default NULL 
         )ENGINE=InnoDB DEFAULT CHARSET=utf8;
         """
     cursor.execute(sql)
