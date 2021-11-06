@@ -4,6 +4,7 @@ from tqdm import tqdm
 
 import database
 from request import request_data
+import Logger
 
 BASE_URL = "https://codereview.qt-project.org"
 

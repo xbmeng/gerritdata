@@ -2,6 +2,8 @@ from timeit import default_timer
 
 import pymysql
 
+from Logger import Logger
+
 host = "localhost"
 port = 3306
 db = "gerrit"
@@ -90,8 +92,8 @@ def create_table(cursor):
     sql = """
     CREATE TABLE if not exists `account_info`(
     `account_id` 	varchar(20) primary key not null,
-    `name`			varchar(30),
-    `username`		varchar(30),
+    `name`			varchar(50),
+    `username`		varchar(50),
     `email`			varchar(200)
     )ENGINE=InnoDB DEFAULT CHARSET=utf8;
     """
@@ -121,7 +123,7 @@ def create_table(cursor):
     cursor.execute(sql)
     sql = """
         CREATE TABLE if not exists `change_message_info`(
-        `change_id`	varchar(200) primary key not null,
+        `change_id`	varchar(200) not null,
         `id`		varchar(100),
         `author_id`	varchar(30),
         `real_author_id`	varchar(30),
@@ -129,16 +131,17 @@ def create_table(cursor):
         `message` blob,
         `revision_number`   int,
         `position`  int,
-        `project`   varchar(50)
+        `project`   varchar(50),
+        PRIMARY KEY (`change_id`,`position`)
         )ENGINE=InnoDB DEFAULT CHARSET=utf8;
         """
     cursor.execute(sql)
     sql = """
         CREATE TABLE if not exists `commit_info`(
         `commit`	varchar(100) primary key not null,
-        `author_name`		varchar(20),
+        `author_name`		varchar(50),
         `author_email`	varchar(200),
-        `committer_name`	varchar(20),
+        `committer_name`	varchar(50),
         `committer_email`   varchar(200),
         `subject` blob,
         `message`   blob
@@ -164,11 +167,11 @@ def create_table(cursor):
     sql = """
         CREATE TABLE if not exists `comment_info`(
         `project`	varchar(50),
-        `change_id`		varchar(100),
+        `change_id`		varchar(200),
         `patch_set`	int,
         `id`	varchar(100) primary key not NULL,
         `path`   varchar(100),
-        `side` varchar(20),
+        `side` varchar(50),
         `parent`    varchar(100),
         `line`  int,
         `comment_range` blob,
@@ -220,14 +223,19 @@ def create_one(table, ):
 
 def insert_many(table, data):
     '''向全部字段插入数据'''
-    with UsingMysql(log_time=False) as um:
-        val = '%s, ' * (len(data[0]) - 1) + '%s'
-        sql = f'insert into {table} values ({val})'
-        if len(data) == 1:
-            um.cursor.execute(sql, data)
-        else:
-            um.cursor.executemany(sql, data)
-        um.cursor.connection.commit()
+    try:
+        with UsingMysql(log_time=False) as um:
+            val = '%s, ' * (len(data[0]) - 1) + '%s'
+            sql = f'insert into {table} values ({val})'
+            if len(data) == 1:
+                um.cursor.execute(sql, data[0])
+            else:
+                um.cursor.executemany(sql, data)
+            um.cursor.connection.commit()
+    except Exception as e:
+        print(str(e))
+        Logger.loge(str(e))
+        Logger.loge("instert:\t" + str(data))
 
 
 # def data_update():
@@ -247,9 +255,10 @@ if __name__ == '__main__':
     #     insert_many("test",data)
     # print(type(data))
     # print(type(data[0]))
-    with UsingMysql(log_time=True) as um:
-        create_table(um.cursor)
+    # with UsingMysql(log_time=True) as um:
+    #     create_table(um.cursor)
 
-    # data = []
-    # data += [(111, "sgj")]
-    # insert_many("test", data)
+    data = []
+    data += [(1112, "sgj")]
+    insert_many("test", data)
+    print(type(data))

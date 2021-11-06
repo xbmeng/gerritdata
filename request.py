@@ -1,8 +1,10 @@
 import requests
 
+from Logger import Logger
+
 
 def request_data(url):
-    # print("Now request:" + url)
+    Logger.logi("request:\t" + url)
     s = requests.session()
     s.keep_alive = False
     try:

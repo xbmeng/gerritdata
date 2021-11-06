@@ -2,7 +2,7 @@ import json
 from tqdm import tqdm
 import database
 from request import request_data
-
+from Logger import Logger
 BASE_URL = "https://codereview.qt-project.org"
 
 
@@ -47,6 +47,8 @@ def get_commentinfo(changeID):
             change_message_id = None
             comment_info += [(project, changeID, patch_set, id, path, side, parent, line, range_str, in_reply_to,
                               message, updated, author_id, unresolved, commit, change_message_id)]
+    # Logger.logi(str(comment_info))
+    # print(str(comment_info))
     return comment_info
 
 
@@ -214,16 +216,16 @@ if __name__ == '__main__':
         change_messages += change_message
         commit_infos += commit_info
         file_infos += file_info
-        if i > 0 and i % 200 == 0:
+        if i > 0 and i % 2 == 0:
             database.insert_many("change_info", change_datas)
             change_datas.clear()
-        if i > 0 and i % 50 == 0:
+        if i > 0 and i % 5 == 0:
             database.insert_many("revision_info", revision_infos)
             revision_infos.clear()
         if i > 0 and i % 10 == 0:
             database.insert_many("commit_relation", commit_relations)
             commit_relations.clear()
-        if i > 0 and i % 150 == 0:
+        if i > 0 and i % 15 == 0:
             database.insert_many("change_message_info", change_messages)
             change_messages.clear()
         if i > 0 and i % 5 == 0:
@@ -234,7 +236,7 @@ if __name__ == '__main__':
             file_infos.clear()
         if i > 0 and i % 5 == 0:
             database.insert_many("comment_info", comment_infos)
-            commit_infos.clear()
+            comment_infos.clear()
     database.insert_many("change_info", change_datas)
     database.insert_many("revision_info", revision_infos)
     database.insert_many("commit_relation", commit_relations)
