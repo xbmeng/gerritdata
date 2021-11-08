@@ -12,4 +12,5 @@ def request_data(url):
     except Exception:
         print("发送Request发生异常")
         print("url" + url)
+        req = request_data()
     return req

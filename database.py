@@ -155,7 +155,7 @@ def create_table(cursor):
         `filename`	varchar(200),
         `status`	varchar(10),
         `binary`   tinyint(1),
-        `old_path` varchar(100),
+        `old_path` varchar(200),
         `lines_inserted`    int,
         `lines_deleted`     int,
         `size_delta`        int,
@@ -170,9 +170,8 @@ def create_table(cursor):
         `change_id`		varchar(200),
         `patch_set`	int,
         `id`	varchar(100) primary key not NULL,
-        `path`   varchar(100),
+        `path`   varchar(200),
         `side` varchar(50),
-        `parent`    varchar(100),
         `line`  int,
         `comment_range` blob,
         `in_reply_to`    varchar(100),
@@ -223,6 +222,8 @@ def create_one(table, ):
 
 def insert_many(table, data):
     '''向全部字段插入数据'''
+    if len(data) == 0:
+        return
     try:
         with UsingMysql(log_time=False) as um:
             val = '%s, ' * (len(data[0]) - 1) + '%s'
@@ -235,7 +236,7 @@ def insert_many(table, data):
     except Exception as e:
         print(str(e))
         Logger.loge(str(e))
-        Logger.loge("instert:\t" + str(data))
+        Logger.loge("instert:\t" + table + "\t" + str(data))
 
 
 # def data_update():
@@ -259,6 +260,6 @@ if __name__ == '__main__':
     #     create_table(um.cursor)
 
     data = []
-    data += [(1112, "sgj")]
+    # data += [(1112, "sgj")]
     insert_many("test", data)
     print(type(data))

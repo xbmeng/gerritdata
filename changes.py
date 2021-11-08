@@ -18,7 +18,7 @@ def get_commentinfo(changeID):
     content = r.text[5:]
     json_object = json.loads(content)
     commit = json_object["commit"]
-    parent = json_object["parents"][0]["commit"]
+    # parent = json_object["parents"][0]["commit"]
     url = BASE_URL + "/changes/" + changeID + "/comments"
     r = request_data(url)
     content = r.text[5:]
@@ -45,7 +45,7 @@ def get_commentinfo(changeID):
             author_id = data["author"]["_account_id"]
             unresolved = 1 if data["unresolved"] == True else 0
             change_message_id = None
-            comment_info += [(project, changeID, patch_set, id, path, side, parent, line, range_str, in_reply_to,
+            comment_info += [(project, changeID, patch_set, id, path, side, line, range_str, in_reply_to,
                               message, updated, author_id, unresolved, commit, change_message_id)]
     # Logger.logi(str(comment_info))
     # print(str(comment_info))
@@ -188,13 +188,13 @@ if __name__ == '__main__':
     changeids = []
     for obj in json_object:
         changeids.append(obj["id"])
-    # while "_more_changes" in json_object[-1].keys() and json_object[-1]["_more_changes"] == True:
-    #     url = BASE_URL + "/changes/" + "?S=" + str(len(changeids))
-    #     r = request_data(url)
-    #     content = r.text[5:]
-    #     json_object = json.loads(content)
-    #     for obj in json_object:
-    #         changeids.append(obj["id"])
+    while "_more_changes" in json_object[-1].keys() and json_object[-1]["_more_changes"] == True:
+        url = BASE_URL + "/changes/" + "?S=" + str(len(changeids))
+        r = request_data(url)
+        content = r.text[5:]
+        json_object = json.loads(content)
+        for obj in json_object:
+            changeids.append(obj["id"])
     print("Changes Sum : ", len(changeids))
     change_datas = []
     revision_infos = []
@@ -203,9 +203,10 @@ if __name__ == '__main__':
     commit_infos = []
     file_infos = []
     comment_infos = []
-    t = tqdm(range(len(changeids[:20])), ncols=80)
+    t = tqdm(range(len(changeids)), ncols=80)
     for i in t:
         tqdm.write("Collecting:" + changeids[i], end="")
+        Logger.logi("Collecting:" + changeids[i])
         change_data, revision_info, commit_relation, commit_info, change_message, file_info = get_changeinfo(
             changeids[i])
         comment_infos += get_commentinfo(changeids[i])
@@ -216,13 +217,13 @@ if __name__ == '__main__':
         change_messages += change_message
         commit_infos += commit_info
         file_infos += file_info
-        if i > 0 and i % 2 == 0:
+        if i > 0 and i % 10 == 0:
             database.insert_many("change_info", change_datas)
             change_datas.clear()
-        if i > 0 and i % 5 == 0:
+        if i > 0 and i % 3 == 0:
             database.insert_many("revision_info", revision_infos)
             revision_infos.clear()
-        if i > 0 and i % 10 == 0:
+        if i > 0 and i % 7 == 0:
             database.insert_many("commit_relation", commit_relations)
             commit_relations.clear()
         if i > 0 and i % 15 == 0:
@@ -231,10 +232,10 @@ if __name__ == '__main__':
         if i > 0 and i % 5 == 0:
             database.insert_many("commit_info", commit_infos)
             commit_infos.clear()
-        if i > 0 and i % 5 == 0:
+        if i > 0 and i % 15 == 0:
             database.insert_many("file_info", file_infos)
             file_infos.clear()
-        if i > 0 and i % 5 == 0:
+        if i > 0 and i % 12 == 0:
             database.insert_many("comment_info", comment_infos)
             comment_infos.clear()
     database.insert_many("change_info", change_datas)
