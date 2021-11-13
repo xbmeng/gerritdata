@@ -1,9 +1,13 @@
 import json
+import os
+
 from tqdm import tqdm
 import database
 from request import request_data
 from Logger import Logger
+
 BASE_URL = "https://codereview.qt-project.org"
+changes_file = os.path.abspath(os.path.dirname(__file__)) + os.sep + "changes"
 
 
 def get_commentinfo(changeID):
@@ -56,7 +60,19 @@ def get_changeinfo(changeId):
     url = BASE_URL + "/changes/" + changeId + "?o=DETAILED_LABELS&o=ALL_REVISIONS&o=ALL_COMMITS&o=ALL_FILES&o=DETAILED_ACCOUNTS&o=REVIEWER_UPDATES&o=MESSAGES&o=CURRENT_ACTIONS&o=CHANGE_ACTIONS&o=REVIEWED&o=COMMIT_FOOTERS"
     r = request_data(url)
     contnet = r.text[5:]
-    json_object = json.loads(contnet)
+    try:
+        json_object = json.loads(contnet)  # json.decoder.JSONDecodeError: Expecting value: line 1 column 1 (char 0)
+    except Exception:
+        print(changeId + "Not Found")
+        Logger.logi(changeId + "Not Found")
+        data = []
+        revisions = []
+        commit_relation = []
+        commit_info = []
+        message = []
+        file_info = []
+        return data, revisions, commit_relation, commit_info, message, file_info
+
     id = json_object["id"]
     project = json_object["project"]
     branch = json_object["branch"]
@@ -91,8 +107,9 @@ def get_change_message(changeid, messages, project):
     ret = []
     for index in range(len(messages)):
         id = messages[index]["id"]
-        author_id = messages[index]["author"]["_account_id"]
-        real_author_id = messages[index]["real_author"]["_account_id"]
+        author_id = None if "author" not in messages[index].keys() else messages[index]["author"]["_account_id"]
+        real_author_id = None if "real_author" not in messages[index].keys() else messages[index]["real_author"][
+            "_account_id"]
         date = messages[index]["date"]
         message = messages[index]["message"]
         revision_number = messages[index]["_revision_number"]
@@ -120,7 +137,7 @@ def get_revisions_info(changeid, revisions, project):
 
         commit, parents, author_name, author_email, committer_name, committer_email, subject, message = get_commit(
             changeid, revision_id)
-        file_infos = get_file(changeid,revision_id)
+        file_infos = get_file(changeid, revision_id)
         ret += [
             (None, project, changeid, kind, number, created, uploader_id, ref, commit_with_footers, commit)]  # 自增主码
         for parent in parents:
@@ -181,20 +198,35 @@ def get_file(changeid, revision_id):
 
 
 if __name__ == '__main__':
-    url = BASE_URL + "/changes/"
-    r = request_data(url)
-    content = r.text[5:]
-    json_object = json.loads(content)
     changeids = []
-    for obj in json_object:
-        changeids.append(obj["id"])
-    while "_more_changes" in json_object[-1].keys() and json_object[-1]["_more_changes"] == True:
-        url = BASE_URL + "/changes/" + "?S=" + str(len(changeids))
+    if os.path.isfile(changes_file):
+        f = open(changes_file, 'r', encoding='utf-8')
+        line = f.readline()
+        while line:
+            changeids += [line]
+            line = f.readline()
+        f.close()
+        for i in range(len(changeids)):
+            changeids[i] = changeids[i].rstrip('\n')
+        # print(len(changeids))
+    else:
+        url = BASE_URL + "/changes/"
         r = request_data(url)
         content = r.text[5:]
         json_object = json.loads(content)
         for obj in json_object:
             changeids.append(obj["id"])
+        while "_more_changes" in json_object[-1].keys() and json_object[-1]["_more_changes"] == True:
+            url = BASE_URL + "/changes/" + "?S=" + str(len(changeids))
+            r = request_data(url)
+            content = r.text[5:]
+            json_object = json.loads(content)
+            for obj in json_object:
+                changeids.append(obj["id"])
+        with open(changes_file, encoding='utf-8') as f:
+            for changeid in changeids:
+                f.write(changeid + "\n")
+    changeids = changeids[1150:]
     print("Changes Sum : ", len(changeids))
     change_datas = []
     revision_infos = []
@@ -206,36 +238,35 @@ if __name__ == '__main__':
     t = tqdm(range(len(changeids)), ncols=80)
     for i in t:
         tqdm.write("Collecting:" + changeids[i], end="")
-        Logger.logi("Collecting:" + changeids[i])
+        Logger.logi("Collecting " + str(i) + " : " + changeids[i])
         change_data, revision_info, commit_relation, commit_info, change_message, file_info = get_changeinfo(
             changeids[i])
         comment_infos += get_commentinfo(changeids[i])
-
         change_datas += change_data
         revision_infos += revision_info
         commit_relations += commit_relation
         change_messages += change_message
         commit_infos += commit_info
         file_infos += file_info
-        if i > 0 and i % 10 == 0:
+        if i > 0 and i % 15 == 0:
             database.insert_many("change_info", change_datas)
             change_datas.clear()
-        if i > 0 and i % 3 == 0:
+        if i > 0 and i % 10 == 0:
             database.insert_many("revision_info", revision_infos)
             revision_infos.clear()
-        if i > 0 and i % 7 == 0:
+        if i > 0 and i % 20 == 0:
             database.insert_many("commit_relation", commit_relations)
             commit_relations.clear()
-        if i > 0 and i % 15 == 0:
+        if i > 0 and i % 5 == 0:
             database.insert_many("change_message_info", change_messages)
             change_messages.clear()
-        if i > 0 and i % 5 == 0:
+        if i > 0 and i % 25 == 0:
             database.insert_many("commit_info", commit_infos)
             commit_infos.clear()
-        if i > 0 and i % 15 == 0:
+        if i > 0 and i % 5 == 0:
             database.insert_many("file_info", file_infos)
             file_infos.clear()
-        if i > 0 and i % 12 == 0:
+        if i > 0 and i % 10 == 0:
             database.insert_many("comment_info", comment_infos)
             comment_infos.clear()
     database.insert_many("change_info", change_datas)
@@ -246,6 +277,34 @@ if __name__ == '__main__':
     database.insert_many("file_info", file_infos)
     database.insert_many("comment_info", comment_infos)
     t.close()
+
+    # qt%2Fqtquickcontrols~dev~I81715d4d8d19cb6118f0e5250ca0e83242e5a476
+
+    # change_datas = []
+    # revision_infos = []
+    # commit_relations = []
+    # change_messages = []
+    # commit_infos = []
+    # file_infos = []
+    # comment_infos = []
+    # change_data, revision_info, commit_relation, commit_info, change_message, file_info = get_changeinfo(
+    #     "qt%2Fqtdeclarative~5.11~I6ddf22f577edc78fba51f142d7420b1e0ef580c6")
+    # print(change_data, revision_info, commit_relation, commit_info, change_message, file_info)
+    # change_datas += change_data
+    # revision_infos += revision_info
+    # commit_relations += commit_relation
+    # change_messages += change_message
+    # commit_infos += commit_info
+    # file_infos += file_info
+    # change_data, revision_info, commit_relation, commit_info, change_message, file_info = get_changeinfo("qtqa%2Fgerrit~v3.3.4-based~Ia2cfa4473b37dbbeab08e906a8aa7444c2e47d9c")
+    # print(change_data, revision_info, commit_relation, commit_info, change_message, file_info)
+    # change_datas += change_data
+    # revision_infos += revision_info
+    # commit_relations += commit_relation
+    # change_messages += change_message
+    # commit_infos += commit_info
+    # file_infos += file_info
+    # database.insert_many("change_info", change_datas)
 
     # for change in changeids:
     #     data += get_changeinfo(change)
